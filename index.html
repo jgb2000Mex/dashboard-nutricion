@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Panel de Control — Javier</title>
+<style>
+  :root{
+    --bg: #14171c;
+    --bg-panel: #1b1f26;
+    --bezel: #23272f;
+    --line: #33393f;
+    --ink: #e8e6df;
+    --ink-dim: #9aa0a6;
+    --blue: #3b6fd6;
+    --green: #3fb950;
+    --yellow: #e3a83c;
+    --red: #e5484d;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --cond: Arial, "Helvetica Neue", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 18px 14px 60px;
+  }
+  h1,h2,h3{font-family:var(--cond); letter-spacing:.08em; text-transform:uppercase; font-weight:800; margin:0;}
+  .head{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  .head h1{font-size:20px; color:var(--ink);}
+  .head .sub{font-family:var(--mono); font-size:11px; color:var(--ink-dim);}
+  .tabs{display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:0;}
+  .tab{
+    padding:9px 16px; font-family:var(--cond); letter-spacing:.08em; text-transform:uppercase;
+    font-size:12px; font-weight:700; color:var(--ink-dim); background:none; border:none; cursor:pointer;
+    border-bottom:2px solid transparent;
+  }
+  .tab.active{color:var(--ink); border-bottom:2px solid var(--blue);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .cluster{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 10px 10px; margin-bottom:16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+  }
+  .cluster-title{font-size:11px; color:var(--ink-dim); text-align:center; margin-bottom:6px;}
+  .gauges{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:6px;}
+  .gauge-box{text-align:center; padding:6px 2px;}
+  .gauge-label{font-size:10px; color:var(--ink-dim); letter-spacing:.08em; text-transform:uppercase; font-family:var(--cond); margin-top:2px;}
+  .gauge-label.kcal-adj{display:flex; align-items:center; justify-content:center; gap:6px;}
+  .kcal-btn{
+    background:var(--bezel); border:1px solid var(--line); color:var(--ink);
+    width:18px; height:18px; line-height:1; border-radius:4px; font-size:12px; font-weight:800;
+    cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center;
+  }
+  .kcal-btn:hover{border-color:var(--blue); color:var(--blue);}
+  .gauge-read{font-family:var(--mono); font-size:14px; margin-top:2px;}
+  .gauge-read .target{color:var(--ink-dim); font-size:11px;}
+  .status-dot{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px;}
+
+  .card{background:var(--bg-panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px;}
+  .card h3{font-size:12px; color:var(--ink-dim); margin-bottom:10px;}
+  .row{display:flex; gap:10px; flex-wrap:wrap;}
+  .field{flex:1; min-width:110px;}
+  label{display:block; font-size:11px; color:var(--ink-dim); margin-bottom:4px; font-family:var(--cond); letter-spacing:.05em; text-transform:uppercase;}
+  input[type=number], input[type=text], textarea, select{
+    width:100%; background:var(--bezel); border:1px solid var(--line); color:var(--ink);
+    padding:8px 9px; border-radius:6px; font-family:var(--mono); font-size:13px;
+  }
+  input[type=date]{
+    width:auto; display:inline-block; background:var(--blue); border:1px solid var(--blue); color:#fff;
+    padding:8px 14px; border-radius:6px; font-family:var(--mono); font-size:13px;
+    color-scheme: dark;
+  }
+  input[type=date]::-webkit-calendar-picker-indicator{
+    filter: invert(1) brightness(1.6);
+    cursor:pointer;
+  }
+  textarea{font-family:inherit; resize:vertical;}
+  button.action{
+    background:var(--blue); color:#fff; border:none; padding:9px 18px; border-radius:6px;
+    font-family:var(--cond); letter-spacing:.06em; text-transform:uppercase; font-size:12px; font-weight:700;
+    cursor:pointer; margin-top:10px;
+  }
+  button.action.secondary{background:transparent; border:1px solid var(--line); color:var(--ink-dim);}
+  button.action:hover{filter:brightness(1.1);}
+  .note{font-size:12px; color:var(--ink-dim); line-height:1.5; margin-top:8px;}
+  .feedback{border-left:3px solid var(--blue); padding:10px 12px; background:var(--bezel); border-radius:0 6px 6px 0; font-size:13px; line-height:1.5; margin-top:10px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th,td{padding:7px 6px; text-align:center; border-bottom:1px solid var(--line);}
+  th{color:var(--ink-dim); font-family:var(--cond); text-transform:uppercase; letter-spacing:.05em; font-weight:700; font-size:10px;}
+  td.day-col{text-align:left; font-family:var(--cond); font-weight:700;}
+
+  .plan-grid{display:grid; grid-template-columns:90px repeat(3,1fr); gap:1px; background:var(--line); border-radius:8px; overflow:hidden;}
+  .plan-grid > div{background:var(--bg-panel); padding:9px 8px; font-size:12px; line-height:1.4;}
+  .plan-grid .ph{background:var(--bezel); font-family:var(--cond); text-transform:uppercase; letter-spacing:.05em; font-size:10px; color:var(--ink-dim); text-align:center;}
+  .plan-grid .dayhead{background:var(--bezel); font-weight:800; font-size:12px; display:flex; align-items:center;}
+  .plan-grid textarea{min-height:70px; font-size:11.5px; padding:5px 6px; border:none; background:transparent;}
+  .plan-grid textarea:focus{outline:1px solid var(--blue); background:var(--bezel);}
+
+  .phase-toggle{display:flex; gap:6px; margin-bottom:12px;}
+  .phase-btn{flex:1; padding:8px; border-radius:6px; border:1px solid var(--line); background:var(--bezel); color:var(--ink-dim); cursor:pointer; font-family:var(--cond); font-size:11px; letter-spacing:.05em; text-transform:uppercase; text-align:center;}
+  .phase-btn.active{background:var(--blue); color:#fff; border-color:var(--blue);}
+
+  .legend{display:flex; gap:14px; font-size:11px; color:var(--ink-dim); justify-content:center; margin-top:4px; flex-wrap:wrap;}
+  .legend span{display:flex; align-items:center; gap:5px;}
+
+  ::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+
+  @media print{
+    body{background:#fff; color:#000; padding:14px;}
+    .no-print, .head .sub, .tabs{display:none !important;}
+    #panel-hoy, #panel-semana, #panel-historial{display:none !important;}
+    #panel-plan{display:block !important;}
+    .head{margin-bottom:10px;}
+    .head h1{color:#000; font-size:16px;}
+    .card{background:#fff; border:1px solid #ccc; box-shadow:none; padding:0;}
+    .card h3{color:#000; font-size:13px; margin-bottom:8px;}
+    .plan-grid{background:#000; border:1px solid #000;}
+    .plan-grid .ph, .plan-grid .dayhead{background:#eee; color:#000;}
+    .plan-grid > div{background:#fff; color:#000;}
+    .plan-grid textarea{color:#000; background:transparent; border:none; resize:none; font-size:11px;}
+    .plan-grid{page-break-inside:auto;}
+    .plan-grid .dayhead{page-break-before:auto; page-break-after:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Panel de Control · Javier</h1>
+  <div class="sub" id="dateNow">—</div>
+</div>
+
+<div class="tabs no-print">
+  <button class="tab active" data-tab="hoy">Hoy</button>
+  <button class="tab" data-tab="semana">Semana</button>
+  <button class="tab" data-tab="plan">Plan 7 días</button>
+  <button class="tab" data-tab="historial">Historial</button>
+</div>
+
+<!-- ===================== TAB: HOY ===================== -->
+<div class="panel active" id="panel-hoy">
+
+  <div class="phase-toggle">
+    <div class="phase-btn active" data-phase="acelerada">Fase acelerada (pre-playa) · 2100 kcal</div>
+    <div class="phase-btn" data-phase="base">Fase base (post-viaje) · 2425 kcal</div>
+  </div>
+
+  <div class="cluster">
+    <div class="cluster-title" id="targetSummary">—</div>
+    <div class="gauges" id="gaugeCluster"></div>
+    <div class="legend">
+      <span><i class="status-dot" style="background:var(--green)"></i>en objetivo</span>
+      <span><i class="status-dot" style="background:var(--yellow)"></i>desviación moderada</span>
+      <span><i class="status-dot" style="background:var(--red)"></i>lejos del objetivo</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Registro diario — captura lo consumido y quemado</h3>
+    <div class="row">
+      <div class="field"><label>Fecha del registro</label><input type="date" id="in_date"></div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div class="field" style="flex:1 1 100%;">
+        <label>Pegar resumen del día (te lo doy yo en el chat, formato KCAL / PROT / GRASA / CARB / QUEMADAS)</label>
+        <textarea id="in_paste" rows="3" placeholder="Pegar aquí datos del día"></textarea>
+        <button class="action secondary" id="btnParse" style="margin-top:8px;">Autocompletar desde texto</button>
+        <div class="note" id="parseStatus"></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px;">
+      <div class="field"><label>Calorías consumidas</label><input type="number" id="in_kcal" placeholder="0"></div>
+      <div class="field"><label>Proteína (g)</label><input type="number" id="in_prot" placeholder="0"></div>
+      <div class="field"><label>Grasa (g)</label><input type="number" id="in_fat" placeholder="0"></div>
+      <div class="field"><label>Carbohidratos (g)</label><input type="number" id="in_carb" placeholder="0"></div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="field"><label>Kcal quemadas (Apple Fitness, ejercicio activo)</label><input type="number" id="in_burn" placeholder="0"></div>
+      <div class="field"><label>Meta de quema del día (opcional)</label><input type="number" id="in_burn_target" placeholder="400"></div>
+      <div class="field" style="flex:2;"><label>Notas / ejercicio realizado</label><input type="text" id="in_notes" placeholder="ej. 45 min fuerza + 20 min bici"></div>
+    </div>
+    <button class="action" id="btnSave">Guardar día</button>
+    <button class="action secondary" id="btnFeedback">Generar retro del día</button>
+    <div class="note">Flujo: me mandas fotos/descripciones de cada comida durante el día. Al cierre, te doy el bloque KCAL/PROT/GRASA/CARB/QUEMADAS listo para copiar. Lo pegas arriba, das "Autocompletar", revisas los números y luego "Guardar día".</div>
+    <div class="feedback" id="feedbackBox" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ===================== TAB: SEMANA ===================== -->
+<div class="panel" id="panel-semana">
+  <div class="cluster">
+    <div class="cluster-title" id="weekTargetSummary">—</div>
+    <div class="gauges" id="weekGaugeCluster"></div>
+    <div class="legend">
+      <span><i class="status-dot" style="background:var(--green)"></i>en objetivo</span>
+      <span><i class="status-dot" style="background:var(--yellow)"></i>desviación moderada</span>
+      <span><i class="status-dot" style="background:var(--red)"></i>lejos del objetivo</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 id="weekRangeLabel">Resumen semanal</h3>
+    <table>
+      <thead>
+        <tr><th style="text-align:left;">Día</th><th>Kcal</th><th>Prot.</th><th>Grasa</th><th>Carb.</th><th>Quemadas</th></tr>
+      </thead>
+      <tbody id="weekTableBody"></tbody>
+    </table>
+    <div class="row" style="margin-top:14px;">
+      <div class="field"><label>Promedio kcal/día</label><div class="gauge-read" id="wAvgKcal">—</div></div>
+      <div class="field"><label>Promedio proteína/día</label><div class="gauge-read" id="wAvgProt">—</div></div>
+      <div class="field"><label>Días registrados</label><div class="gauge-read" id="wDaysLogged">—</div></div>
+      <div class="field"><label>Déficit semanal estimado</label><div class="gauge-read" id="wDeficit">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Notas de cierre de semana (domingo)</h3>
+    <textarea id="weekNotes" rows="5" placeholder="Escribe o pide que Claude resuma aquí los avances, lo que funcionó y los ajustes para la próxima semana..."></textarea>
+    <button class="action" id="btnSaveWeekNotes">Guardar notas</button>
+  </div>
+</div>
+
+<!-- ===================== TAB: PLAN ===================== -->
+<div class="panel" id="panel-plan">
+  <div class="card">
+    <h3 id="planWeekLabel">Plan de comidas — próximos 7 días (fase acelerada, ~2100 kcal · 160P/70G/205C, sin fruta salvo plátano)</h3>
+    <div class="plan-grid" id="planGrid"></div>
+    <div class="row no-print" style="margin-top:12px;">
+      <button class="action" id="btnSavePlan">Guardar cambios al plan</button>
+      <button class="action secondary" id="btnPrintPlan">Imprimir / Exportar PDF</button>
+    </div>
+    <div class="note no-print">El plan usa leche Lala 100 sin grasa, Habits Probiotic Vanilla y barras Wild Protein como base. Edita cualquier celda directamente — se guarda para la próxima vez que abras el panel. "Imprimir / Exportar PDF" abre el diálogo de impresión del navegador — ahí puedes imprimir en papel o elegir "Guardar como PDF" para mandarlo a la cocina.</div>
+  </div>
+</div>
+
+<!-- ===================== TAB: HISTORIAL ===================== -->
+<div class="panel" id="panel-historial">
+  <div class="card">
+    <h3>Historial de días registrados</h3>
+    <table>
+      <thead><tr><th style="text-align:left;">Fecha</th><th>Kcal</th><th>Prot.</th><th>Grasa</th><th>Carb.</th><th>Quemadas</th><th>Notas</th></tr></thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+    <div class="note" id="historyEmpty">Aún no hay días guardados.</div>
+  </div>
+</div>
+
+<script>
+const TARGETS = {
+  acelerada: { kcal:2100, prot:160, fat:70, carb:205 },
+  base:      { kcal:2425, prot:160, fat:80, carb:266 }
+};
+let currentPhase = "acelerada";
+let kcalTargetOverride = null; // null = usa el objetivo de fase; si no, kcal ajustadas manualmente para el día
+const KCAL_STEP = 50;
+
+function pad(n){return n.toString().padStart(2,"0");}
+function dateKey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+function todayDate(){return new Date();}
+function mondayOf(d){
+  const dd = new Date(d);
+  const day = dd.getDay(); // 0 sun .. 6 sat
+  const diff = (day===0?-6:1-day);
+  dd.setDate(dd.getDate()+diff);
+  dd.setHours(0,0,0,0);
+  return dd;
+}
+function fmtLong(d){
+  return d.toLocaleDateString('es-MX',{weekday:'long', day:'numeric', month:'long'});
+}
+
+document.getElementById('dateNow').textContent = fmtLong(todayDate());
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='semana') renderWeek();
+    if(t.dataset.tab==='historial') renderHistory();
+  });
+});
+
+document.querySelectorAll('.phase-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.phase-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    currentPhase = b.dataset.phase;
+    renderGauges();
+  });
+});
+
+// ---------- GAUGE RENDERING ----------
+function statusColor(value, target, isBurn){
+  if(!target || target<=0) return 'var(--ink-dim)';
+  const ratio = value/target;
+  if(isBurn){
+    if(ratio>=1) return 'var(--green)';
+    if(ratio>=0.5) return 'var(--yellow)';
+    return 'var(--red)';
+  }
+  const diff = Math.abs(ratio-1);
+  if(diff<=0.07) return 'var(--green)';
+  if(diff<=0.20) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function gaugeSVG(value, target, color, isBurn){
+  const ratio = Math.max(0, Math.min(target>0? value/target : 0, 1.5));
+  const cx=60, cy=58, r=46;
+
+  function angleForRatio(rr){
+    return -180 + (rr/1.5)*180; // -180 at ratio 0, 0 at ratio 1.5
+  }
+
+  function arcAt(a,b,radius){
+    const s = {x: cx + radius*Math.cos(a*Math.PI/180), y: cy + radius*Math.sin(a*Math.PI/180)};
+    const e = {x: cx + radius*Math.cos(b*Math.PI/180), y: cy + radius*Math.sin(b*Math.PI/180)};
+    const large = (b-a)>180?1:0;
+    return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
+  }
+
+  // Zone breakpoints expressed as ratio thresholds, matching statusColor()'s actual logic
+  const stops = isBurn
+    ? [
+        {from:0,    to:0.50, c:'var(--red)'},
+        {from:0.50, to:1.00, c:'var(--yellow)'},
+        {from:1.00, to:1.50, c:'var(--green)'}
+      ]
+    : [
+        {from:0,    to:0.80, c:'var(--red)'},
+        {from:0.80, to:0.93, c:'var(--yellow)'},
+        {from:0.93, to:1.07, c:'var(--green)'},
+        {from:1.07, to:1.20, c:'var(--yellow)'},
+        {from:1.20, to:1.50, c:'var(--red)'}
+      ];
+
+  let zoneArcs = stops.map(s=>`<path d="${arcAt(angleForRatio(s.from),angleForRatio(s.to),r)}" stroke="${s.c}" stroke-width="9" fill="none" stroke-linecap="butt" opacity="0.55"/>`).join('');
+
+  const needleAngleDeg = angleForRatio(ratio);
+  const nx = cx + (r-8)*Math.cos(needleAngleDeg*Math.PI/180);
+  const ny = cy + (r-8)*Math.sin(needleAngleDeg*Math.PI/180);
+
+  return `
+  <svg viewBox="0 0 120 70" width="100%" height="72">
+    ${zoneArcs}
+    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="4.5" fill="${color}"/>
+  </svg>`;
+}
+
+function getTodayEntry(){
+  return {
+    kcal: parseFloat(document.getElementById('in_kcal').value)||0,
+    prot: parseFloat(document.getElementById('in_prot').value)||0,
+    fat:  parseFloat(document.getElementById('in_fat').value)||0,
+    carb: parseFloat(document.getElementById('in_carb').value)||0,
+    burn: parseFloat(document.getElementById('in_burn').value)||0,
+    burnTarget: parseFloat(document.getElementById('in_burn_target').value)||400,
+    notes: document.getElementById('in_notes').value||"",
+    phase: currentPhase,
+    kcalTarget: kcalTargetOverride
+  };
+}
+
+function effectiveKcalTarget(){
+  const t = TARGETS[currentPhase];
+  return (kcalTargetOverride!==null && kcalTargetOverride!==undefined) ? kcalTargetOverride : t.kcal;
+}
+
+function adjustKcalTarget(delta){
+  const base = effectiveKcalTarget();
+  kcalTargetOverride = Math.max(0, base + delta);
+  renderGauges();
+}
+
+function resetKcalTarget(){
+  kcalTargetOverride = null;
+  renderGauges();
+}
+
+function renderGauges(){
+  const t = TARGETS[currentPhase];
+  const e = getTodayEntry();
+  const kcalTarget = effectiveKcalTarget();
+  const isAdjusted = kcalTargetOverride!==null && kcalTargetOverride!==undefined;
+  document.getElementById('targetSummary').textContent =
+    `Objetivo · ${kcalTarget} kcal${isAdjusted? ' (ajustado)':''} — ${t.prot}P / ${t.fat}G / ${t.carb}C`;
+
+  const metrics = [
+    {label:'Calorías', value:e.kcal, target:kcalTarget, unit:'kcal', adjustable:true},
+    {label:'Proteína', value:e.prot, target:t.prot, unit:'g'},
+    {label:'Grasa', value:e.fat, target:t.fat, unit:'g'},
+    {label:'Carbos', value:e.carb, target:t.carb, unit:'g'},
+    {label:'Quemadas', value:e.burn, target:e.burnTarget, unit:'kcal', isBurn:true}
+  ];
+
+  const html = metrics.map(m=>{
+    const color = statusColor(m.value, m.target, m.isBurn);
+    const labelRow = m.adjustable
+      ? `<div class="gauge-label kcal-adj">
+           <button type="button" class="kcal-btn" data-delta="-${KCAL_STEP}">−</button>
+           <span>${m.label}${isAdjusted? ' *':''}</span>
+           <button type="button" class="kcal-btn" data-delta="${KCAL_STEP}">+</button>
+         </div>`
+      : `<div class="gauge-label">${m.label}</div>`;
+    return `<div class="gauge-box">
+      ${gaugeSVG(m.value, m.target, color, m.isBurn)}
+      <div class="gauge-read"><span class="status-dot" style="background:${color}"></span>${m.value||0}<span class="target"> / ${m.target}${m.unit}</span></div>
+      ${labelRow}
+    </div>`;
+  }).join('');
+  document.getElementById('gaugeCluster').innerHTML = html;
+
+  document.querySelectorAll('.kcal-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      adjustKcalTarget(parseInt(b.dataset.delta,10));
+    });
+  });
+}
+
+['in_kcal','in_prot','in_fat','in_carb','in_burn','in_burn_target'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', renderGauges);
+});
+
+// ---------- PASTE PARSER ----------
+function parsePastedSummary(text){
+  const out = {};
+  const patterns = {
+    kcal:  /(?:kcal|cal[oó]r[ií]as?)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i,
+    prot:  /(?:prot(?:e[ií]na)?s?)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i,
+    fat:   /(?:grasas?|fat)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i,
+    carb:  /(?:carb(?:ohidratos?)?)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i,
+    burn:  /(?:quemad[ao]s?|burn(?:ed)?)\s*[:=]?\s*(-?\d+(?:[.,]\d+)?)/i,
+    notes: /(?:notas?|notes?)\s*[:=]?\s*(.+)/i
+  };
+  for(const key in patterns){
+    const m = text.match(patterns[key]);
+    if(m){
+      out[key] = key==='notes' ? m[1].trim() : parseFloat(m[1].replace(',','.'));
+    }
+  }
+  return out;
+}
+
+document.getElementById('btnParse').addEventListener('click', ()=>{
+  const text = document.getElementById('in_paste').value;
+  const status = document.getElementById('parseStatus');
+  if(!text.trim()){
+    status.textContent = 'Pega primero el resumen que te doy en el chat.';
+    return;
+  }
+  const parsed = parsePastedSummary(text);
+  const found = [];
+  if(parsed.kcal!==undefined){ document.getElementById('in_kcal').value = parsed.kcal; found.push('kcal'); }
+  if(parsed.prot!==undefined){ document.getElementById('in_prot').value = parsed.prot; found.push('proteína'); }
+  if(parsed.fat!==undefined){ document.getElementById('in_fat').value = parsed.fat; found.push('grasa'); }
+  if(parsed.carb!==undefined){ document.getElementById('in_carb').value = parsed.carb; found.push('carbohidratos'); }
+  if(parsed.burn!==undefined){ document.getElementById('in_burn').value = parsed.burn; found.push('quemadas'); }
+  if(parsed.notes!==undefined){ document.getElementById('in_notes').value = parsed.notes; found.push('notas'); }
+
+  if(found.length===0){
+    status.textContent = 'No reconocí ningún campo — revisa que uses las etiquetas KCAL / PROT / GRASA / CARB / QUEMADAS.';
+  } else {
+    status.textContent = `Campos completados: ${found.join(', ')}. Revisa los números y da clic en "Guardar día".`;
+  }
+  renderGauges();
+});
+
+
+function selectedDate(){
+  const v = document.getElementById('in_date').value; // YYYY-MM-DD
+  if(!v) return todayDate();
+  const [y,m,d] = v.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+async function loadDay(){
+  const key = 'day:'+dateKey(selectedDate());
+  document.getElementById('in_paste').value = '';
+  document.getElementById('parseStatus').textContent = '';
+  document.getElementById('in_kcal').value = '';
+  document.getElementById('in_prot').value = '';
+  document.getElementById('in_fat').value = '';
+  document.getElementById('in_carb').value = '';
+  document.getElementById('in_burn').value = '';
+  document.getElementById('in_burn_target').value = 400;
+  document.getElementById('in_notes').value = '';
+  kcalTargetOverride = null;
+  try{
+    const r = await window.storage.get(key);
+    if(r && r.value){
+      const d = JSON.parse(r.value);
+      document.getElementById('in_kcal').value = d.kcal||'';
+      document.getElementById('in_prot').value = d.prot||'';
+      document.getElementById('in_fat').value = d.fat||'';
+      document.getElementById('in_carb').value = d.carb||'';
+      document.getElementById('in_burn').value = d.burn||'';
+      document.getElementById('in_burn_target').value = d.burnTarget||400;
+      document.getElementById('in_notes').value = d.notes||'';
+      if(d.phase){
+        currentPhase = d.phase;
+        document.querySelectorAll('.phase-btn').forEach(b=>b.classList.toggle('active', b.dataset.phase===d.phase));
+      }
+      if(d.kcalTarget!==undefined && d.kcalTarget!==null){
+        kcalTargetOverride = d.kcalTarget;
+      }
+    }
+  }catch(err){ /* no entry yet para esa fecha */ }
+  document.getElementById('feedbackBox').style.display='none';
+  renderGauges();
+}
+
+document.getElementById('in_date').addEventListener('change', loadDay);
+
+document.getElementById('btnSave').addEventListener('click', async ()=>{
+  const key = 'day:'+dateKey(selectedDate());
+  const entry = getTodayEntry();
+  entry.date = dateKey(selectedDate());
+  try{
+    await window.storage.set(key, JSON.stringify(entry));
+    const btn = document.getElementById('btnSave');
+    const orig = btn.textContent;
+    btn.textContent = 'Guardado ✓';
+    setTimeout(()=>btn.textContent=orig, 1400);
+  }catch(err){ console.error('Error guardando', err); }
+});
+
+document.getElementById('btnFeedback').addEventListener('click', ()=>{
+  const t = TARGETS[currentPhase];
+  const e = getTodayEntry();
+  const kcalTarget = effectiveKcalTarget();
+  const box = document.getElementById('feedbackBox');
+  box.style.display='block';
+  box.innerHTML = buildFeedback(e, t, kcalTarget);
+});
+
+function buildFeedback(e,t,kcalTarget){
+  const lines = [];
+  const kcalDiff = e.kcal - kcalTarget;
+  const protDiff = e.prot - t.prot;
+
+  if(e.kcal===0){
+    return "Aún no has registrado calorías hoy. Vacía tus totales para que pueda darte retro real, no genérica.";
+  }
+
+  if(Math.abs(kcalDiff) <= kcalTarget*0.05){
+    lines.push(`Calorías: ${e.kcal} kcal, prácticamente en el objetivo (${kcalTarget}). Bien ejecutado.`);
+  } else if(kcalDiff>0){
+    lines.push(`Calorías: te pasaste ${Math.round(kcalDiff)} kcal del objetivo (${e.kcal} vs ${kcalTarget}). En fase acelerada esto sí importa — no es catástrofe si fue un día, pero si se repite mañana ya es patrón.`);
+  } else {
+    lines.push(`Calorías: quedaste ${Math.abs(Math.round(kcalDiff))} kcal por debajo del objetivo. Ojo con esto — quedarte muy corto seguido suele terminar en el patrón de "desquitarse" después.`);
+  }
+
+  if(protDiff < -15){
+    lines.push(`Proteína: ${e.prot}g contra ${t.prot}g — faltante importante. Esto es lo que más se te complica; si mañana no metes una fuente de proteína en cada comida, el hueco se vuelve a abrir.`);
+  } else if(protDiff < 0){
+    lines.push(`Proteína: ${e.prot}g, un poco corto de ${t.prot}g pero manejable.`);
+  } else {
+    lines.push(`Proteína: ${e.prot}g, objetivo cumplido (${t.prot}g). Esto es lo que sostiene el músculo en déficit.`);
+  }
+
+  if(e.burn>0){
+    lines.push(`Actividad: ${e.burn} kcal activas registradas${e.notes? ' — '+e.notes: ''}.`);
+  } else {
+    lines.push(`No registraste kcal quemadas de Apple Fitness hoy — mándamelas para cerrar el balance real del día.`);
+  }
+
+  return lines.map(l=>`<p style="margin:4px 0;">${l}</p>`).join('');
+}
+
+// ---------- WEEK ----------
+async function renderWeek(){
+  const monday = mondayOf(todayDate());
+  const days = [];
+  for(let i=0;i<7;i++){
+    const d = new Date(monday);
+    d.setDate(d.getDate()+i);
+    days.push(d);
+  }
+  document.getElementById('weekRangeLabel').textContent =
+    `Resumen semanal · ${fmtLong(days[0])} — ${fmtLong(days[6])}`;
+
+  let rows = '';
+  let sumKcal=0,sumProt=0,sumFat=0,sumCarb=0,sumBurn=0,logged=0;
+  const t = TARGETS[currentPhase];
+
+  for(const d of days){
+    const key = 'day:'+dateKey(d);
+    let entry = null;
+    try{
+      const r = await window.storage.get(key);
+      if(r && r.value) entry = JSON.parse(r.value);
+    }catch(err){}
+    const dayName = d.toLocaleDateString('es-MX',{weekday:'short', day:'numeric'});
+    if(entry){
+      logged++;
+      sumKcal+=entry.kcal||0; sumProt+=entry.prot||0; sumFat+=entry.fat||0; sumCarb+=entry.carb||0; sumBurn+=entry.burn||0;
+      rows += `<tr><td class="day-col">${dayName}</td><td>${entry.kcal||0}</td><td>${entry.prot||0}</td><td>${entry.fat||0}</td><td>${entry.carb||0}</td><td>${entry.burn||0}</td></tr>`;
+    } else {
+      rows += `<tr><td class="day-col">${dayName}</td><td colspan="5" style="color:var(--ink-dim)">sin registro</td></tr>`;
+    }
+  }
+  document.getElementById('weekTableBody').innerHTML = rows;
+  document.getElementById('wDaysLogged').textContent = logged+' / 7';
+  document.getElementById('wAvgKcal').textContent = logged? Math.round(sumKcal/logged)+' kcal' : '—';
+  document.getElementById('wAvgProt').textContent = logged? Math.round(sumProt/logged)+' g' : '—';
+  const proratedTarget = t.kcal*(logged||0);
+  document.getElementById('wDeficit').textContent = logged? (sumKcal - proratedTarget >=0? '+' : '')+Math.round(sumKcal-proratedTarget)+' kcal vs meta de esos '+logged+' día(s)' : '—';
+
+  renderWeekGauges({
+    kcal: logged? sumKcal/logged : 0,
+    prot: logged? sumProt/logged : 0,
+    fat:  logged? sumFat/logged : 0,
+    carb: logged? sumCarb/logged : 0,
+    burn: logged? sumBurn/logged : 0
+  }, t, logged);
+
+  try{
+    const wkey = 'weeknotes:'+dateKey(monday);
+    const r = await window.storage.get(wkey);
+    document.getElementById('weekNotes').value = (r&&r.value)? r.value : '';
+  }catch(err){ document.getElementById('weekNotes').value=''; }
+}
+
+document.getElementById('btnSaveWeekNotes').addEventListener('click', async ()=>{
+  const monday = mondayOf(todayDate());
+  const wkey = 'weeknotes:'+dateKey(monday);
+  try{
+    await window.storage.set(wkey, document.getElementById('weekNotes').value);
+    const btn = document.getElementById('btnSaveWeekNotes');
+    const orig = btn.textContent; btn.textContent='Guardado ✓';
+    setTimeout(()=>btn.textContent=orig,1400);
+  }catch(err){ console.error(err); }
+});
+
+// ---------- HISTORY ----------
+async function renderHistory(){
+  try{
+    const list = await window.storage.list('day:');
+    if(!list || !list.keys || list.keys.length===0){
+      document.getElementById('historyBody').innerHTML='';
+      document.getElementById('historyEmpty').style.display='block';
+      return;
+    }
+    document.getElementById('historyEmpty').style.display='none';
+    const keys = list.keys.sort().reverse();
+    let rows='';
+    for(const k of keys){
+      try{
+        const r = await window.storage.get(k);
+        const d = JSON.parse(r.value);
+        rows += `<tr><td class="day-col">${d.date||k.replace('day:','')}</td><td>${d.kcal||0}</td><td>${d.prot||0}</td><td>${d.fat||0}</td><td>${d.carb||0}</td><td>${d.burn||0}</td><td style="text-align:left;color:var(--ink-dim)">${d.notes||''}</td></tr>`;
+      }catch(err){}
+    }
+    document.getElementById('historyBody').innerHTML = rows;
+  }catch(err){
+    document.getElementById('historyEmpty').style.display='block';
+    document.getElementById('historyEmpty').textContent = 'No se pudo cargar el historial.';
+  }
+}
+
+function renderWeekGauges(avg, t, logged){
+  document.getElementById('weekTargetSummary').textContent = logged
+    ? `Promedio diario de la semana (${logged} día${logged===1?'':'s'} registrado${logged===1?'':'s'}) · Objetivo ${t.kcal} kcal — ${t.prot}P / ${t.fat}G / ${t.carb}C`
+    : `Sin días registrados esta semana todavía`;
+
+  const burnTargetDefault = 400;
+  const metrics = [
+    {label:'Calorías', value:Math.round(avg.kcal), target:t.kcal, unit:'kcal'},
+    {label:'Proteína', value:Math.round(avg.prot), target:t.prot, unit:'g'},
+    {label:'Grasa', value:Math.round(avg.fat), target:t.fat, unit:'g'},
+    {label:'Carbos', value:Math.round(avg.carb), target:t.carb, unit:'g'},
+    {label:'Quemadas', value:Math.round(avg.burn), target:burnTargetDefault, unit:'kcal', isBurn:true}
+  ];
+
+  const html = metrics.map(m=>{
+    const color = logged? statusColor(m.value, m.target, m.isBurn) : 'var(--ink-dim)';
+    return `<div class="gauge-box">
+      ${gaugeSVG(m.value, m.target, color, m.isBurn)}
+      <div class="gauge-read"><span class="status-dot" style="background:${color}"></span>${m.value||0}<span class="target"> / ${m.target}${m.unit}</span></div>
+      <div class="gauge-label">${m.label}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('weekGaugeCluster').innerHTML = html;
+}
+
+
+const DEFAULT_PLAN = {
+  Lunes: {
+    D: "Omelette de 3 claras + 1 huevo entero con espinaca y champiñones (30g queso panela) + 1 plátano + café con leche Lala sin grasa. ~480 kcal / 38P",
+    C: "Pechuga de pollo a la plancha (200g) con arroz integral (1 taza) y ensalada de nopales y jitomate. ~560 kcal / 48P",
+    Ce: "Salmón al horno (150g) con brócoli al vapor y camote asado (1 pieza mediana). ~520 kcal / 38P"
+  },
+  Martes: {
+    D: "Licuado: 1 scoop Habits Probiotic Vanilla + leche Lala sin grasa + avena (40g) + 1 plátano. ~430 kcal / 35P",
+    C: "Tacos de res deshebrada (150g) en tortilla de maíz (3) con pico de gallo, frijoles refritos (1/2 taza). ~600 kcal / 45P",
+    Ce: "Pechuga de pavo a la plancha con ensalada verde grande, aceite de oliva y garbanzos (1/2 taza). ~470 kcal / 40P"
+  },
+  Miércoles: {
+    D: "2 huevos enteros revueltos + 1 rebanada de pan integral + aguacate (1/4) + café con leche Lala sin grasa. ~440 kcal / 26P",
+    C: "Filete de tilapia (200g) al mojo de ajo con arroz blanco (2/3 taza) y calabacitas salteadas. ~550 kcal / 44P",
+    Ce: "Sopa de lentejas con verdura + 100g de pollo deshebrado encima. ~500 kcal / 38P"
+  },
+  Jueves: {
+    D: "Yogurt griego natural (200g) + Habits Probiotic Vanilla (1/2 scoop) + 1 plátano en rodajas. ~380 kcal / 34P",
+    C: "Bistec de res (180g) a la plancha con ensalada de nopales, cebolla asada y frijoles de la olla (1/2 taza). ~570 kcal / 46P",
+    Ce: "Pechuga de pollo en cubos salteada con verduras chinas (pimiento, brócoli, zanahoria) y salsa de soya baja en sodio. ~460 kcal / 42P"
+  },
+  Viernes: {
+    D: "Hot cakes de avena y claras (2 piezas, sin harina) con 1 plátano y un chorrito de miel + café con leche Lala. ~450 kcal / 30P",
+    C: "Pescado blanco empapelado con verduras y limón + arroz integral (2/3 taza). ~520 kcal / 40P",
+    Ce: "Wild Protein bar + omelette ligero de claras con champiñones si queda hueco calórico. ~380 kcal / 30P"
+  },
+  Sábado: {
+    D: "Chilaquiles verdes horneados (no fritos) con pechuga deshebrada (150g) y poco queso. ~520 kcal / 42P",
+    C: "Camarones a la plancha con ajo (200g) + ensalada de espinaca, jitomate y pepino + 1/2 taza de arroz. ~500 kcal / 40P",
+    Ce: "Pechuga de pollo asada con puré de coliflor y ejotes salteados. ~450 kcal / 42P"
+  },
+  Domingo: {
+    D: "Huevos al gusto (2 enteros + 2 claras) con frijoles refritos y 1 tortilla de maíz + 1 plátano. ~480 kcal / 32P",
+    C: "Comida libre controlada: proteína a la plancha (pollo, res o pescado 200g) + doble porción de verdura + una porción moderada de carbohidrato. ~600 kcal / 45P",
+    Ce: "Licuado Habits Probiotic Vanilla + leche Lala sin grasa + un puño de nueces. ~350 kcal / 28P"
+  }
+};
+
+let planData = JSON.parse(JSON.stringify(DEFAULT_PLAN));
+
+function renderPlanGrid(){
+  const days = Object.keys(planData);
+  let html = `<div class="ph"></div><div class="ph">Desayuno</div><div class="ph">Comida</div><div class="ph">Cena</div>`;
+  days.forEach(day=>{
+    html += `<div class="dayhead">${day}</div>`;
+    ['D','C','Ce'].forEach(slot=>{
+      html += `<div><textarea data-day="${day}" data-slot="${slot}">${planData[day][slot]}</textarea></div>`;
+    });
+  });
+  document.getElementById('planGrid').innerHTML = html;
+  document.querySelectorAll('#planGrid textarea').forEach(ta=>{
+    ta.addEventListener('input', ()=>{
+      planData[ta.dataset.day][ta.dataset.slot] = ta.value;
+    });
+  });
+}
+
+async function loadPlan(){
+  const monday = mondayOf(todayDate());
+  const key = 'plan:'+dateKey(monday);
+  try{
+    const r = await window.storage.get(key);
+    if(r && r.value) planData = JSON.parse(r.value);
+  }catch(err){ /* usa default */ }
+  renderPlanGrid();
+  document.getElementById('planWeekLabel').textContent =
+    `Plan de comidas — semana del ${fmtLong(monday)} (fase acelerada, ~2100 kcal · 160P/70G/205C, sin fruta salvo plátano)`;
+}
+
+document.getElementById('btnSavePlan').addEventListener('click', async ()=>{
+  const monday = mondayOf(todayDate());
+  const key = 'plan:'+dateKey(monday);
+  try{
+    await window.storage.set(key, JSON.stringify(planData));
+    const btn = document.getElementById('btnSavePlan');
+    const orig = btn.textContent; btn.textContent='Guardado ✓';
+    setTimeout(()=>btn.textContent=orig,1400);
+  }catch(err){ console.error(err); }
+});
+
+document.getElementById('btnPrintPlan').addEventListener('click', ()=>{
+  window.print();
+});
+
+// ---------- INIT ----------
+(async function init(){
+  document.getElementById('in_date').value = dateKey(todayDate());
+  await loadDay();
+  await loadPlan();
+})();
+</script>
+</body>
+</html>
