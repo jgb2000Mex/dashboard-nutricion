@@ -252,6 +252,29 @@
 </div>
 
 <script>
+// Persistencia real en localStorage del navegador (antes window.storage no existía y todo se perdía en silencio)
+window.storage = (function(){
+  const PREFIX = 'nutricion:';
+  return {
+    async get(key){
+      const raw = localStorage.getItem(PREFIX+key);
+      return raw===null ? null : { value: raw };
+    },
+    async set(key, value){
+      localStorage.setItem(PREFIX+key, value);
+      return true;
+    },
+    async list(prefix){
+      const keys = [];
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if(k && k.startsWith(PREFIX+prefix)) keys.push(k.slice(PREFIX.length));
+      }
+      return { keys };
+    }
+  };
+})();
+
 const TARGETS = {
   acelerada: { kcal:2100, prot:160, fat:70, carb:205 },
   base:      { kcal:2425, prot:160, fat:80, carb:266 }
