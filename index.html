@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Panel de Control — Javier</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --bg: #14171c;
@@ -63,7 +64,7 @@
   .row{display:flex; gap:10px; flex-wrap:wrap;}
   .field{flex:1; min-width:110px;}
   label{display:block; font-size:11px; color:var(--ink-dim); margin-bottom:4px; font-family:var(--cond); letter-spacing:.05em; text-transform:uppercase;}
-  input[type=number], input[type=text], textarea, select{
+  input[type=number], input[type=text], input[type=email], input[type=password], textarea, select{
     width:100%; background:var(--bezel); border:1px solid var(--line); color:var(--ink);
     padding:8px 9px; border-radius:6px; font-family:var(--mono); font-size:13px;
   }
@@ -128,9 +129,24 @@
 </head>
 <body>
 
+<div id="loginScreen" style="position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:24px;width:100%;max-width:320px;">
+    <h1 style="font-size:16px;margin-bottom:16px;">Panel de Control</h1>
+    <div class="field" style="margin-bottom:10px;"><label>Correo</label><input type="email" id="loginEmail" autocomplete="username"></div>
+    <div class="field" style="margin-bottom:4px;"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="action" id="btnLogin" style="width:100%;">Entrar</button>
+    <div id="loginError" style="color:var(--red); font-size:12px; margin-top:10px; min-height:14px;"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
 <div class="head">
   <h1>Panel de Control · Javier</h1>
-  <div class="sub" id="dateNow">—</div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <div class="sub" id="dateNow">—</div>
+    <button class="action secondary no-print" id="btnLogout" style="margin-top:0; padding:5px 10px; font-size:10px;">Cerrar sesión</button>
+  </div>
 </div>
 
 <div class="tabs no-print">
@@ -251,29 +267,74 @@
   </div>
 </div>
 
+</div><!-- /#app -->
+
 <script>
-// Persistencia real en localStorage del navegador (antes window.storage no existía y todo se perdía en silencio)
-window.storage = (function(){
-  const PREFIX = 'nutricion:';
-  return {
-    async get(key){
-      const raw = localStorage.getItem(PREFIX+key);
-      return raw===null ? null : { value: raw };
-    },
-    async set(key, value){
-      localStorage.setItem(PREFIX+key, value);
-      return true;
-    },
-    async list(prefix){
-      const keys = [];
-      for(let i=0;i<localStorage.length;i++){
-        const k = localStorage.key(i);
-        if(k && k.startsWith(PREFIX+prefix)) keys.push(k.slice(PREFIX.length));
-      }
-      return { keys };
-    }
-  };
-})();
+// ---------- SUPABASE: AUTH + PERSISTENCIA (reemplaza window.storage por la tabla kv_store) ----------
+const SUPABASE_URL = 'https://pffcunjlftottasfrhfx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZmN1bmpsZnRvdHRhc2ZyaGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNTMxNDYsImV4cCI6MjA5OTYyOTE0Nn0.0pp0QNBQOB7p7ZXodlZzei5vSvlvuQFwzDmpkWaHxe8';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let appInitialized = false;
+
+window.storage = {
+  async get(key){
+    if(!currentUser) return null;
+    const { data, error } = await sb.from('kv_store').select('value').eq('user_id', currentUser.id).eq('key', key).maybeSingle();
+    if(error || !data) return null;
+    return { value: data.value };
+  },
+  async set(key, value){
+    if(!currentUser) throw new Error('No hay sesión activa');
+    const { error } = await sb.from('kv_store').upsert({ user_id: currentUser.id, key, value, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    return true;
+  },
+  async list(prefix){
+    if(!currentUser) return { keys: [] };
+    const { data, error } = await sb.from('kv_store').select('key').eq('user_id', currentUser.id).like('key', prefix+'%');
+    if(error) return { keys: [] };
+    return { keys: data.map(r=>r.key) };
+  }
+};
+
+async function showApp(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  if(!appInitialized){
+    appInitialized = true;
+    await initApp();
+  }
+}
+
+function showLogin(){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errBox = document.getElementById('loginError');
+  errBox.textContent = '';
+  if(!email || !password){ errBox.textContent = 'Captura correo y contraseña.'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errBox.textContent = 'Correo o contraseña incorrectos.'; }
+});
+
+document.getElementById('loginPassword').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') document.getElementById('btnLogin').click();
+});
+
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+});
+
+sb.auth.onAuthStateChange((_event, session)=>{
+  currentUser = session?.user ?? null;
+  if(currentUser) showApp(); else showLogin();
+});
 
 const TARGETS = {
   acelerada: { kcal:2100, prot:160, fat:70, carb:205 },
@@ -802,11 +863,11 @@ document.getElementById('btnPrintPlan').addEventListener('click', ()=>{
 });
 
 // ---------- INIT ----------
-(async function init(){
+async function initApp(){
   document.getElementById('in_date').value = dateKey(todayDate());
   await loadDay();
   await loadPlan();
-})();
+}
 </script>
 </body>
 </html>
